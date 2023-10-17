@@ -3,82 +3,88 @@ import WebSocket from "ws";
 import express, { Request, Response, Application } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import { ServerType } from "../_shared/enums/server-type.enum";
 
 class MaJoDo {
-  private type: string;
-  private gameServer: dgram.Socket | WebSocket.Server | null;
-  private httpServer: Application | null;
-  private clientsRoom: Map<string, string[]>;
+    private readonly type: ServerType;
+    private gameServer: dgram.Socket | WebSocket.Server | null = null;
+    private httpServer: Application | null = null;
+    private clientsRoom: Map<string, string[]> = new Map();
 
-  constructor(type: string) {
-    this.type = type;
-    this.gameServer = null;
-    this.httpServer = null;
-    this.clientsRoom = new Map<string, string[]>();
-  }
-
-  start(serverAddress: string, gameServerPort: number, httpServerPort: number) {
-    if (this.type === "UDP") {
-      this._startUdpServer(serverAddress, gameServerPort);
-    } else if (this.type === "WS") {
-      this._startWsServer(gameServerPort);
-    } else {
-      throw new Error("Unsupported server type. Choose either 'UDP' or 'WS'.");
+    constructor(type: ServerType) {
+        this.type = type;
     }
 
-    this.httpServer = express();
+    start(serverAddress: string, gameServerPort: number, httpServerPort: number): void {
+        this.initGameServer(serverAddress, gameServerPort);
+        this.initHttpServer(serverAddress, httpServerPort);
+    }
 
-    this.httpServer.use(helmet());
-    this.httpServer.use(cors());
-    this.httpServer.use(express.json({ limit: "50mb" }));
-    this.httpServer.use(express.urlencoded({ extended: true, limit: "50mb" }));
+    private initGameServer(serverAddress: string, port: number): void {
+        switch (this.type) {
+            case ServerType.UDP:
+                this._startUdpServer(serverAddress, port);
+                break;
+            case ServerType.WS:
+                this._startWsServer(port);
+                break;
+            default:
+                throw new Error("Unsupported server type. Choose either 'UDP' or 'WS'.");
+        }
+    }
 
-    
-    const roomRouter = require('../httpServer/routes/roomRouter')
-    this.httpServer.use('/api/room', roomRouter)
+    private initHttpServer(serverAddress: string, port: number): void {
+        this.httpServer = express();
 
-    this.httpServer.get("/api/health", (req: Request, res: Response) => {
-      res.send("hsis");
-    });
+        this.httpServer.use(helmet());
+        this.httpServer.use(cors());
+        this.httpServer.use(express.json({ limit: "50mb" }));
+        this.httpServer.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-    this.httpServer.listen(httpServerPort, serverAddress, () => {
-      console.log(`Server is listening on ${serverAddress}:${httpServerPort}`);
-    });
-  }
+        const roomRouter = require('../httpServer/routes/roomRouter');
+        this.httpServer.use('/api/room', roomRouter);
 
-  private _startUdpServer(serverAddress: string, port: number) {
-    this.gameServer = dgram.createSocket("udp4");
-    this.gameServer.on("message", (msg: string, rinfo) => {
-      // const message = GameMessage.decode(msg);
-      console.log(`UDP received: ${msg}`);
-      // console.log(`UDP received: ${message.content}`);
-    });
-    this.gameServer.bind(port, serverAddress);
-  }
+        this.httpServer.get("/api/health", (req: Request, res: Response) => {
+            res.send("Server is healthy");
+        });
 
-  private _startWsServer(port: number) {
-    this.gameServer = new WebSocket.Server({ port: port });
-    this.gameServer.on("connection", (ws) => {
-      ws.on("message", (msg) => {
-        // const message = GameMessage.decode(new Uint8Array(msg));
-        // console.log(`WebSocket received: ${message.content}`);
-        console.log(`WebSocket received: ${msg}`);
-      });
-    });
-  }
+        this.httpServer.listen(port, serverAddress, () => {
+            console.log(`Server is listening on ${serverAddress}:${port}`);
+        });
+    }
 
-  getType(): string {
-    return this.type;
-  }
-  getGameServer(): dgram.Socket | WebSocket.Server | null {
-    return this.gameServer;
-  }
-  getHttpServer(): Application | null {
-    return this.httpServer;
-  }
-  getClientsRoom(): Map<string, string[]> {
-    return this.clientsRoom;
-  }
+    private _startUdpServer(serverAddress: string, port: number): void {
+        this.gameServer = dgram.createSocket("udp4");
+        this.gameServer.on("message", (msg: Buffer, rinfo: dgram.RemoteInfo) => {
+            console.log(`UDP received: ${msg.toString()}`);
+        });
+        this.gameServer.bind(port, serverAddress);
+    }
+
+    private _startWsServer(port: number): void {
+        this.gameServer = new WebSocket.Server({ port });
+        this.gameServer.on("connection", (ws) => {
+            ws.on("message", (msg) => {
+                console.log(`WebSocket received: ${msg}`);
+            });
+        });
+    }
+
+    getType(): string {
+        return this.type;
+    }
+
+    getGameServer(): dgram.Socket | WebSocket.Server | null {
+        return this.gameServer;
+    }
+
+    getHttpServer(): Application | null {
+        return this.httpServer;
+    }
+
+    getClientsRoom(): Map<string, string[]> {
+        return this.clientsRoom;
+    }
 }
 
 export default MaJoDo;
