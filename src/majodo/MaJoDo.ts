@@ -4,12 +4,13 @@ import express, { Request, Response, Application } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { ServerType } from "../_shared/enums/server-type.enum";
+import roomRouter from '../httpServer/routes/roomRouter';
 
 class MaJoDo {
     private readonly type: ServerType;
     private gameServer: dgram.Socket | WebSocket.Server | null = null;
     private httpServer: Application | null = null;
-    private clientsRoom: Map<string, string[]> = new Map();
+    public static clientsRoom: Map<string, string[]> = new Map();
 
     constructor(type: ServerType) {
         this.type = type;
@@ -41,7 +42,6 @@ class MaJoDo {
         this.httpServer.use(express.json({ limit: "50mb" }));
         this.httpServer.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-        const roomRouter = require('../httpServer/routes/roomRouter');
         this.httpServer.use('/api/room', roomRouter);
 
         this.httpServer.get("/api/health", (req: Request, res: Response) => {
@@ -80,10 +80,6 @@ class MaJoDo {
 
     getHttpServer(): Application | null {
         return this.httpServer;
-    }
-
-    getClientsRoom(): Map<string, string[]> {
-        return this.clientsRoom;
     }
 }
 

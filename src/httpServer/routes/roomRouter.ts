@@ -1,9 +1,11 @@
-const express = require('express')
-const router = express.Router()
-// const {createScheduledRoom, getScheduledRooms, getScheduledRoom} = require('../controllers/room/roomController')
+import express from "express";
+import roomController from "../controllers/room/room.controller";
+import JoinRoomValidator from "../guards/join-room.guard";
 
-// router.get('/schedule/get/:id', getScheduledRooms)
-// router.get('/schedule/getsingle/:roomCode', getScheduledRoom)
-// router.post('/schedule/create', createScheduledRoom)
+const router = express.Router();
 
-module.exports = router
+router.get("/", roomController.getRooms);
+router.post("/join", JoinRoomValidator, roomController.joinRoom);
+router.post("/create", roomController.createRoomAndJoin);
+
+export default router;
