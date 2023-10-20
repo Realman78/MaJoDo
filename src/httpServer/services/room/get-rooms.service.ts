@@ -4,7 +4,7 @@ import MaJoDo from "../../../majodo/MaJoDo";
 const getRooms = (req: Request, res: Response) => {
     // const roomsObject = Object.fromEntries(MaJoDo.clientsRoom.entries());
     console.log(MaJoDo.clientsRoom,MaJoDo.tokens, MaJoDo.roomsToClient)
-    res.send("roomsObject");
+    res.send({data: Object.keys(MaJoDo.roomsToClient), message: "Success"});
 };
 
 

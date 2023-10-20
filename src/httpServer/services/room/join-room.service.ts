@@ -1,16 +1,17 @@
 import { Request, Response } from "express";
 import MaJoDo from "../../../majodo/MaJoDo";
+import jwt from "jsonwebtoken"
 
 const joinRoom = (req: Request, res: Response) => {
     const roomName = req.body.roomName;
-    // const currentMembers = MaJoDo.clientsRoom.get(roomName) || [];
 
-    // if (!currentMembers.length) {
-    //     res.status(404).send({error: `No room with ID ${roomName} found.`})
-    // }
+    const token = jwt.sign({ roomName }, process.env.JWT_SECRET as string, {
+        expiresIn: '10m'
+    });
+    
+    MaJoDo.tokens.push(token)
 
-    // MaJoDo.clientsRoom.set(roomName, [...currentMembers, req.ip]);
-    res.send({message: "Joined room " + roomName});
+    res.send({data: {token}, message: "Success."});
 };
 
 export default joinRoom;

@@ -21,7 +21,9 @@ interface RoomToClient {
 class MaJoDo {
   private gameServer: dgram.Socket | WebSocket.Server | null = null;
   private httpServer: Application | null = null;
-  private lastReceivedTimestamps = new Map<string, Date>();
+  private lastReceivedUserTimestamps = new Map<string, Date>();
+  public static IDLE_ALLOWED_TIMEOUT = 300_000;
+  public static IDLE_CHECK_TIMEOUT = 30_000;
   public static clientsRoom: ClientRoom = {};
   public static roomsToClient: RoomToClient = {};
   public static tokens: string[] = [];
@@ -33,9 +35,9 @@ class MaJoDo {
     }
   }
 
-  start(serverAddress: string, gameServerPort: number, httpServerPort: number): void {
+  start(serverAddress: string, gameServerPort: number, httpServerPort: number, httpDataLimit: string = "50mb"): void {
     this.initGameServer(serverAddress, gameServerPort);
-    this.initHttpServer(serverAddress, httpServerPort);
+    this.initHttpServer(serverAddress, httpServerPort, httpDataLimit);
   }
 
   private initGameServer(serverAddress: string, port: number): void {
@@ -48,13 +50,13 @@ class MaJoDo {
     }
   }
 
-  private initHttpServer(serverAddress: string, port: number): void {
+  private initHttpServer(serverAddress: string, port: number, httpDataLimit: string): void {
     this.httpServer = express();
 
     this.httpServer.use(helmet());
     this.httpServer.use(cors());
-    this.httpServer.use(express.json({ limit: "50mb" }));
-    this.httpServer.use(express.urlencoded({ extended: true, limit: "50mb" }));
+    this.httpServer.use(express.json({ limit: httpDataLimit }));
+    this.httpServer.use(express.urlencoded({ extended: true, limit: httpDataLimit }));
 
     this.httpServer.use("/api/room", roomRouter);
     this.httpServer.get("/api/health", (req: Request, res: Response) => {
@@ -75,6 +77,7 @@ class MaJoDo {
     udpServer.on("message", (msg: Buffer, rinfo: dgram.RemoteInfo) => {
       const uid = _uid(rinfo.address, rinfo.port);
       const message = msg.toString();
+      console.log(uid, message)
       this.handleUdpMessage(uid, message);
     });
 
@@ -84,9 +87,9 @@ class MaJoDo {
   private handleUdpMessage(uid: string, message: string): void {
     const playersRoom = MaJoDo.clientsRoom[uid];
     if (playersRoom) {
-      this.lastReceivedTimestamps.set(uid, new Date());
+      this.lastReceivedUserTimestamps.set(uid, new Date());
       const players = MaJoDo.roomsToClient[playersRoom];
-      this.broadcastMessageToRoom(players, message);
+      this.broadcastMessageToRoom(players, message, uid);
     }
 
     if (message.length > 30 && MaJoDo.tokens.includes(message)) {
@@ -100,6 +103,8 @@ class MaJoDo {
         MaJoDo.clientsRoom[uid] = roomName;
         
         MaJoDo.tokens = MaJoDo.tokens.filter(token => token !== message);
+
+        this.sendToPlayer(uid, "SUCCESS")
       } catch (error) {
         console.log("Failed to decode JWT:", error);
       }
@@ -115,13 +120,15 @@ class MaJoDo {
     });
   }
 
-  private broadcastMessageToRoom(players: string[], msg: string): void {
+  private broadcastMessageToRoom(players: string[], msg: string, uid: string): void {
     players.forEach(player => {
+      if (player === uid) return
       const [playerIP, playerPortStr] = player.split(":");
       const playerPort = parseInt(playerPortStr, 10);
 
       if (this.gameServer && this.gameServer instanceof dgram.Socket) {
-        this.gameServer.send(msg, playerPort, playerIP, error => {
+        console.log(playerPort)
+        this.gameServer.send(`${uid};#${msg}`, playerPort, playerIP, error => {
           if (error) {
             console.error(`Failed to send message to ${playerIP}:${playerPort}`);
           }
@@ -130,16 +137,33 @@ class MaJoDo {
     });
   }
 
+  private sendToPlayer(uid: string, msg: string) {
+    const [playerIP, playerPortStr] = uid.split(":");
+    const playerPort = parseInt(playerPortStr, 10);
+
+    if (this.gameServer && this.gameServer instanceof dgram.Socket) {
+      this.gameServer.send(msg, playerPort, playerIP, error => {
+        if (error) {
+          console.error(`Failed to send message to ${playerIP}:${playerPort}`);
+        }
+      });
+    }
+  }
+
   private setupCleanup(): void {
     setInterval(() => {
       const now = new Date();
-      this.lastReceivedTimestamps.forEach((lastReceived, uid) => {
-        if (now.getTime() - lastReceived.getTime() > 120_000) {
-          delete MaJoDo.clientsRoom[uid];
-          this.lastReceivedTimestamps.delete(uid);
+      this.lastReceivedUserTimestamps.forEach((lastReceived, uid) => {
+        if (now.getTime() - lastReceived.getTime() > MaJoDo.IDLE_ALLOWED_TIMEOUT) {
+          this.lastReceivedUserTimestamps.delete(uid);
+          const roomName = MaJoDo.clientsRoom[uid];
+          MaJoDo.roomsToClient[roomName] = MaJoDo.roomsToClient[roomName].filter(client => client !== uid);
+          delete MaJoDo.clientsRoom[uid]
+          if (!MaJoDo.roomsToClient[roomName].length)
+            delete MaJoDo.roomsToClient[roomName]
         }
       });
-    }, 60_000);
+    }, MaJoDo.IDLE_CHECK_TIMEOUT);
   }
 
   getType(): ServerType {

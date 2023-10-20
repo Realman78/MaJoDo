@@ -17,8 +17,6 @@ const createRoomAndJoin = (req: Request, res: Response) => {
     
     MaJoDo.tokens.push(token)
 
-    // MaJoDo.rooms.push(roomName)
-    // MaJoDo.clientsRoom[_uid(req.socket.remoteAddress, req.socket.remotePort)]
     res.send({data: {token}, message: "Success."});
 };
 
