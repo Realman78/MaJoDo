@@ -1,0 +1,1 @@
+export const VOID_MESSAGE = "SERVER: You're not connected to any room. The message you sent has no target nor its a request to join a room."
