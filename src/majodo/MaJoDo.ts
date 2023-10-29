@@ -1,5 +1,5 @@
 import dgram from "dgram";
-import WebSocket from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import express, { Request, Response, Application } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -8,8 +8,12 @@ import { ServerType } from "../_shared/enums/server-type.enum";
 import { _uid } from "../_shared/utils/string-utils.util";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import http from "http"
 dotenv.config();
 
+interface PlayerConnection {
+  [uid: string]: WebSocket;
+}
 interface ClientRoom {
   [uid: string]: string;
 }
@@ -19,58 +23,69 @@ interface RoomToClient {
 }
 
 class MaJoDo {
-  private gameServer: dgram.Socket | WebSocket.Server | null = null;
-  private httpServer: Application | null = null;
-  private lastReceivedUserTimestamps = new Map<string, Date>();
   public static IDLE_ALLOWED_TIMEOUT = 300_000;
-  public static IDLE_CHECK_TIMEOUT = 30_000;
+  public static IDLE_CHECK_TIMEOUT = 300_000;
   public static clientsRoom: ClientRoom = {};
   public static roomsToClient: RoomToClient = {};
   public static tokens: string[] = [];
+  
+  private static playerConnections: PlayerConnection = {};
+  
+  private httpServer: http.Server | null = null;
+  private gameServer: dgram.Socket | WebSocket.Server | null = null;
+  private expressServer: Application | null = null;
+  private lastReceivedUserTimestamps = new Map<string, Date>();
   private readonly JWT_SECRET = process.env.JWT_SECRET || "";
 
-  constructor(private readonly type: ServerType) {
+  constructor(private readonly type: ServerType, private readonly serverAddress: string, private readonly httpServerPort: number, private readonly udpServerPort: number = 2001) {
+    this.serverAddress = serverAddress;
+    this.httpServerPort = httpServerPort;
+    this.udpServerPort = udpServerPort;
     if (!this.JWT_SECRET) {
       console.warn(`ADD AN ENVIRONMENT VARIABLE "JWT_SECRET"!!!`);
     }
   }
 
-  start(serverAddress: string, gameServerPort: number, httpServerPort: number, httpDataLimit: string = "50mb"): void {
-    this.initGameServer(serverAddress, gameServerPort);
-    this.initHttpServer(serverAddress, httpServerPort, httpDataLimit);
+  start(httpDataLimit: string = "50mb"): void {
+    this.initHttpServer(httpDataLimit);
+    this.initGameServer();
   }
 
-  private initGameServer(serverAddress: string, port: number): void {
+  private initGameServer(): void {
     if (this.type === ServerType.UDP) {
-      this.startUdpServer(serverAddress, port);
+      this.startUdpServer();
     } else if (this.type === ServerType.WS) {
-      this.startWsServer(port);
+      this.startWsServer();
     } else {
       throw new Error("Unsupported server type. Choose either 'UDP' or 'WS'.");
     }
   }
 
-  private initHttpServer(serverAddress: string, port: number, httpDataLimit: string): void {
-    this.httpServer = express();
+  private initHttpServer(httpDataLimit: string): void {
+    this.expressServer = express();
 
-    this.httpServer.use(helmet());
-    this.httpServer.use(cors());
-    this.httpServer.use(express.json({ limit: httpDataLimit }));
-    this.httpServer.use(express.urlencoded({ extended: true, limit: httpDataLimit }));
+    this.expressServer.use(helmet());
+    this.expressServer.use(cors());
+    this.expressServer.use(express.json({ limit: httpDataLimit }));
+    this.expressServer.use(express.urlencoded({ extended: true, limit: httpDataLimit }));
 
-    this.httpServer.use("/api/room", roomRouter);
-    this.httpServer.get("/api/health", (req: Request, res: Response) => {
+    this.expressServer.use("/api/room", roomRouter);
+    this.expressServer.get("/api/health", (req: Request, res: Response) => {
       res.send("Server is healthy");
     });
 
-    this.httpServer.listen(port, serverAddress, () => {
-      console.log(`Server is listening on ${serverAddress}:${port}`);
+    // @ts-ignore
+    this.httpServer = http.createServer(this.expressServer)
+
+
+    this.httpServer?.listen(this.httpServerPort, this.serverAddress, () => {
+      console.log(`Server is listening on ${this.serverAddress}:${this.httpServerPort}`);
     });
 
     this.setupCleanup();
   }
 
-  private startUdpServer(serverAddress: string, port: number): void {
+  private startUdpServer(): void {
     const udpServer = dgram.createSocket("udp4");
     this.gameServer = udpServer;
 
@@ -81,7 +96,7 @@ class MaJoDo {
       this.handleUdpMessage(uid, message);
     });
 
-    udpServer.bind(port, serverAddress);
+    udpServer.bind(this.udpServerPort, this.serverAddress);
   }
 
   private handleUdpMessage(uid: string, message: string): void {
@@ -111,44 +126,95 @@ class MaJoDo {
     }
   }
 
-  private startWsServer(port: number): void {
-    this.gameServer = new WebSocket.Server({ port });
-    this.gameServer.on("connection", ws => {
-      ws.on("message", msg => {
-        console.log(`WebSocket received: ${msg}`);
+  private startWsServer(): void {
+    // @ts-ignore
+    const wsServer = new WebSocket.Server({ server: this.httpServer });
+    this.gameServer = wsServer;
+
+    wsServer.on("connection", (ws, req) => {
+      const ip = req.socket.remoteAddress;
+      const port = req.socket.remotePort;
+
+      
+      ws.on("message", (msg) => {
+        const uid = _uid(ip, port);
+        ws.send("marinmarinimarinaierntiuasndfgijukasdfnfkjhb")
+        console.log(uid, msg)
+        this.handleWsMessage(uid, msg.toString(), ws);
       });
     });
+   
+  }
+
+  private handleWsMessage(uid: string, message: string, ws: WebSocket): void {
+    const playersRoom = MaJoDo.clientsRoom[uid];
+    if (playersRoom) {
+      this.lastReceivedUserTimestamps.set(uid, new Date());
+      const players = MaJoDo.roomsToClient[playersRoom];
+      this.broadcastMessageToRoom(players, message, uid);
+    }
+
+    if (message.length > 30 && MaJoDo.tokens.includes(message)) {
+      try {
+        const decodedPayload = jwt.verify(message, this.JWT_SECRET) as { roomName: string };
+        const roomName = decodedPayload.roomName;
+
+        const currentPlayers = MaJoDo.roomsToClient[roomName] || [];
+        MaJoDo.roomsToClient[roomName] = [...currentPlayers, uid];
+
+        MaJoDo.clientsRoom[uid] = roomName;
+        
+        MaJoDo.playerConnections[uid] = ws;
+
+        MaJoDo.tokens = MaJoDo.tokens.filter(token => token !== message);
+
+        this.sendToPlayer(uid, "SUCCESS")
+      } catch (error) {
+        console.log("Failed to decode JWT:", error);
+      }
+    }
   }
 
   private broadcastMessageToRoom(players: string[], msg: string, uid: string): void {
+    if (!this.gameServer) return
     players.forEach(player => {
       if (player === uid) return
-      const [playerIP, playerPortStr] = player.split(":");
-      const playerPort = parseInt(playerPortStr, 10);
-
-      if (this.gameServer && this.gameServer instanceof dgram.Socket) {
+      
+      if (this.gameServer instanceof dgram.Socket && this.type === ServerType.UDP) {
+        const [playerIP, playerPortStr] = player.split(":");
+        const playerPort = parseInt(playerPortStr, 10);
         console.log(playerPort)
         this.gameServer.send(`${uid};#${msg}`, playerPort, playerIP, error => {
           if (error) {
             console.error(`Failed to send message to ${playerIP}:${playerPort}`);
           }
         });
+      } else if (this.gameServer instanceof WebSocket.Server && this.type === ServerType.WS) {
+        const roomId = MaJoDo.clientsRoom[uid]
+        for (let playerUID of MaJoDo.roomsToClient[roomId]) {
+          if (playerUID === uid) continue;
+          MaJoDo.playerConnections[playerUID].send(`${uid};#${msg}`)
+        }
       }
     });
   }
 
   private sendToPlayer(uid: string, msg: string) {
-    const [playerIP, playerPortStr] = uid.split(":");
-    const playerPort = parseInt(playerPortStr, 10);
+      if (this.gameServer instanceof dgram.Socket && this.type === ServerType.UDP) {
+        const [playerIP, playerPortStr] = uid.split(":");
+        const playerPort = parseInt(playerPortStr, 10);
 
-    if (this.gameServer && this.gameServer instanceof dgram.Socket) {
-      this.gameServer.send(msg, playerPort, playerIP, error => {
-        if (error) {
-          console.error(`Failed to send message to ${playerIP}:${playerPort}`);
+        if (this.gameServer && this.gameServer instanceof dgram.Socket) {
+          this.gameServer.send(msg, playerPort, playerIP, error => {
+            if (error) {
+              console.error(`Failed to send message to ${playerIP}:${playerPort}`);
+            }
+          });
         }
-      });
+      } else if (this.gameServer instanceof WebSocket.Server && this.type === ServerType.WS) {
+        MaJoDo.playerConnections[uid].send(msg)
+      }
     }
-  }
 
   private setupCleanup(): void {
     setInterval(() => {
@@ -174,8 +240,8 @@ class MaJoDo {
     return this.gameServer;
   }
 
-  getHttpServer(): Application | null {
-    return this.httpServer;
+  getExpressServer(): Application | null {
+    return this.expressServer;
   }
 }
 
