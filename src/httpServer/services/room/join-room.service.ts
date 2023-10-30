@@ -5,6 +5,9 @@ import jwt from "jsonwebtoken"
 const joinRoom = (req: Request, res: Response) => {
     const roomName = req.body.roomName;
 
+    if (!MaJoDo.roomsToClient[roomName]) {
+        return res.send({data: null, message: `Room ${roomName} not found.`})
+    }
     const token = jwt.sign({ roomName }, process.env.JWT_SECRET as string, {
         expiresIn: '10m'
     });
