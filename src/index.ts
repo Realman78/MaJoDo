@@ -6,3 +6,6 @@ majodo.start()
 majodo.getGameServerRaw()?.on("listening", () => {
     console.log("hi")
 })
+majodo.getExpressServer()?.get("marin", (req,res) => {
+    console.log("Marin")
+})
