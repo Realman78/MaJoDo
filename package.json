@@ -1,6 +1,6 @@
 {
   "name": "majodo",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A template game server",
   "main": "dist/index.js",
   "scripts": {
