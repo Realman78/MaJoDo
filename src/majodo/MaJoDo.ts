@@ -127,7 +127,7 @@ class MaJoDo {
     return this.gameServerRaw;
   }
 
-  getExpressServer(): Application | null {
+  getExpressServer(): Application {
     return this.expressServer;
   }
 }

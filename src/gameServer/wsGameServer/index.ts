@@ -1,10 +1,11 @@
 import WebSocket from "ws";
 import http from "http"
 import protobuf from "protobufjs"
+import path from "path";
+import jwt from "jsonwebtoken"
 import { _uid } from "../../_shared/utils/string-utils.util";
 import { GameServerInterface } from "../gameServer.interface";
 import MaJoDo from "../../majodo/MaJoDo";
-import jwt from "jsonwebtoken"
 import { JWT_SECRET } from "../../_shared/config/config";
 import { VOID_MESSAGE } from "../../_shared/constants/messages";
 
@@ -16,7 +17,8 @@ export class WebSocketGameServer implements GameServerInterface{
         this.gameServer = new WebSocket.Server({ server: httpServer });
 
         if (useProtobuffers) {
-            protobuf.load("./src/_shared/protobufs/message.proto", (err, root) => {
+            const protoPath = path.join(__dirname, '../../_shared/protobufs/message.proto');
+            protobuf.load(protoPath, (err, root) => {
                 if (err) throw err;
                 if (!root) process.exit(1);
 
