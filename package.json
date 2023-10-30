@@ -2,7 +2,7 @@
   "name": "majodo",
   "version": "1.0.0",
   "description": "A template game server",
-  "main": "dist/majodo/MaJoDo.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
