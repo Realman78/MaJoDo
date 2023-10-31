@@ -64,6 +64,8 @@ Easily set up a game server and focus solely on your client-side with MaJoDo. Ch
  3. Use the JWT token to send data to the server (UDP/WS).
  4. Enjoy automatic room routing and data forwarding.
 
+![image](https://github.com/Realman78/MaJoDo/assets/42566748/700f8e48-6f7c-446f-b735-1b5400aef973)
+
   
 ## Documentation & Tutorials
 
