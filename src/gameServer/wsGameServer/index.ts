@@ -8,6 +8,7 @@ import { GameServerInterface } from "../gameServer.interface";
 import MaJoDo from "../../majodo/MaJoDo";
 import { JWT_SECRET } from "../../_shared/config/config";
 import { VOID_MESSAGE } from "../../_shared/constants/messages";
+import { MessageType } from "../../_shared/enums/message-types.enum";
 
 export class WebSocketGameServer implements GameServerInterface{
     private gameServer: WebSocket.Server;
@@ -53,12 +54,14 @@ export class WebSocketGameServer implements GameServerInterface{
 
     
     private handleWsMessage(uid: string, message: string, ws: WebSocket): void {
+        console.log(message)
         const playersRoom = MaJoDo.clientsRoom[uid];
         if (playersRoom) {
             MaJoDo.lastReceivedUserTimestamps.set(uid, new Date());
             const players = MaJoDo.roomsToClient[playersRoom];
-            this.broadcastMessageToRoom(players, message, uid);
-        } else if (message.length > 30 && MaJoDo.tokens.includes(message)) {
+            this.broadcastMessageToRoom(players, message, uid, MessageType.ROOM);
+        } 
+        else if (message.length > 30 && MaJoDo.tokens.includes(message)) {
             try {
                 const decodedPayload = jwt.verify(message, JWT_SECRET) as {roomName: string;};
                 const roomName = decodedPayload.roomName;
@@ -73,42 +76,42 @@ export class WebSocketGameServer implements GameServerInterface{
                 MaJoDo.tokens = MaJoDo.tokens.filter((token) => token !== message);
                 
                 MaJoDo.lastReceivedUserTimestamps.set(uid, new Date());
-                this.sendToPlayer(uid, "SUCCESS");
+                this.sendToPlayer(uid, `Successfully joined room ${roomName}. Your ID: ${uid}`, MessageType.JOIN_ROOM);
             } catch (error) {
                 console.log("Failed to decode JWT:", error);
             }
         }
-        else ws.send(this.useProtobuffers ? this.Message.encode({content: VOID_MESSAGE}).finish() : VOID_MESSAGE);
+        else ws.send(this.useProtobuffers 
+            ? this.Message.encode({content: VOID_MESSAGE, type: MessageType.SERVER_INFO}).finish() 
+            : JSON.stringify({content: VOID_MESSAGE, type: MessageType.SERVER_INFO}));
 
     }
     
-    broadcastMessageToRoom(players: string[], msg: string, uid: string): void {
+    broadcastMessageToRoom(players: string[], msg: string, uid: string, type: number): void {
+        const payload = { content: `${uid};#${msg}`, type};
+        const processedPayload = this.useProtobuffers 
+            ? this.Message.encode(payload).finish() 
+            : JSON.stringify(payload);
+        const roomId = MaJoDo.clientsRoom[uid];
+        
         players.forEach((player) => {
             if (player === uid) return;
-
-            if (!this.useProtobuffers) {
-                const roomId = MaJoDo.clientsRoom[uid];
-
-                for (let playerUID of MaJoDo.roomsToClient[roomId]) {
-                    if (playerUID === uid) continue;
-                    MaJoDo.playerConnections[playerUID].send(`${uid};#${msg}`);
-                }
-            } else {
-                const roomId = MaJoDo.clientsRoom[uid];
-
-                for (let playerUID of MaJoDo.roomsToClient[roomId]) {
-                    if (playerUID === uid) continue;
-                    const payload = { content: `${uid};#${msg}`};
-                    MaJoDo.playerConnections[playerUID].send(this.Message.encode(payload).finish());
-                }
+            for (let playerUID of MaJoDo.roomsToClient[roomId]) {
+                if (playerUID === uid) continue;
+                MaJoDo.playerConnections[playerUID].send(processedPayload);
             }
         });
     }
 
-    sendToPlayer(uid: string, msg: string): void {
+    sendToPlayer(uid: string, msg: string, type: number): void {
+        const payload: any = {content: msg, type}
+        if (type === MessageType.JOIN_ROOM) {
+            payload.uid = uid;
+            payload.roomId = MaJoDo.clientsRoom[uid];
+        }
         MaJoDo.playerConnections[uid].send(this.useProtobuffers 
-            ? this.Message.encode({content: msg}).finish() 
-            : msg);
+            ? this.Message.encode(payload).finish() 
+            : JSON.stringify(payload));
     }
 
     public getGameServerRaw() {

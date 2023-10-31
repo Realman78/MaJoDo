@@ -8,6 +8,7 @@ import { JWT_SECRET } from "../_shared/config/config";
 import { MajodoHttpServer } from "../httpServer";
 import { WebSocketGameServer } from "../gameServer/wsGameServer";
 import { UDPGameServer } from "../gameServer/udpGameServer";
+import { MessageType } from "../_shared/enums/message-types.enum";
 
 interface PlayerConnection {
   [uid: string]: WebSocket;
@@ -105,7 +106,7 @@ class MaJoDo {
           delete MaJoDo.clientsRoom[uid];
 
           if (MaJoDo.playerConnections[uid] && this.type !== ServerType.UDP) {
-            this.gameServer.sendToPlayer(uid, "SERVER: TIMEOUT DISCONNECT");
+            this.gameServer.sendToPlayer(uid, "SERVER: TIMEOUT DISCONNECT", MessageType.SERVER_ERROR);
           }
 
           if (!MaJoDo.roomsToClient[roomName].length)
