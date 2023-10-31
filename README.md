@@ -2,7 +2,7 @@
 # MaJoDo - Game Server
 
 Easily set up a game server and focus solely on your client-side with MaJoDo. Choose from three different server types to suit your needs: UDP, WebSockets, or WebSockets with Protocol Buffers.
-
+Find example clients [here](https://github.com/Realman78/majodo-client-examples)
 
 ## Features
 
