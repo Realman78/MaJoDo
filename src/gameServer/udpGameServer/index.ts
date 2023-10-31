@@ -20,6 +20,7 @@ export class UDPGameServer implements GameServerInterface {
         });
     
         this.gameServer.bind(this.udpServerPort, this.serverAddress);
+        console.log(`UDP server listening on ${this.serverAddress}:${this.udpServerPort}`)
     }
 
     private handleUdpMessage(uid: string, message: string): void {
@@ -84,7 +85,12 @@ export class UDPGameServer implements GameServerInterface {
     sendToPlayer(uid: string, msg: string, type: number): void {
         const [playerIP, playerPortStr] = uid.split(":");
         const playerPort = parseInt(playerPortStr, 10);
-        const payload = {content: msg, type}
+        const payload: any = {content: msg, type}
+
+        if (type === MessageType.JOIN_ROOM) {
+            payload.uid = uid;
+            payload.roomId = MaJoDo.clientsRoom[uid];
+        }
 
         this.gameServer.send(JSON.stringify(payload), playerPort, playerIP, (error) => {
             if (error) console.error(`Failed to send message to ${playerIP}:${playerPort}`);

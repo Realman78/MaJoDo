@@ -36,7 +36,11 @@ Easily set up a game server and focus solely on your client-side with MaJoDo. Ch
     const MaJoDo = require('majodo');
 
     // Create a new instance with desired server type, host, and ports
-    const majodo = new MaJoDo(ServerType.WS, "0.0.0.0", 3000, 1934);
+    const majodo = new MaJoDo(ServerType.WS, "0.0.0.0", 3000);
+
+    // UDP: 
+    // const majodo = new MaJoDo(ServerType.WS, "0.0.0.0", 3000, UDP_PORT);
+
     
     // Start the server
     majodo.start();

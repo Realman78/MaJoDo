@@ -54,7 +54,6 @@ export class WebSocketGameServer implements GameServerInterface{
 
     
     private handleWsMessage(uid: string, message: string, ws: WebSocket): void {
-        console.log(message)
         const playersRoom = MaJoDo.clientsRoom[uid];
         if (playersRoom) {
             MaJoDo.lastReceivedUserTimestamps.set(uid, new Date());
