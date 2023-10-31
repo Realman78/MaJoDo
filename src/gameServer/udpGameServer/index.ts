@@ -20,7 +20,7 @@ export class UDPGameServer implements GameServerInterface {
         });
     
         this.gameServer.bind(this.udpServerPort, this.serverAddress);
-        console.log(`UDP server listening on ${this.serverAddress}:${this.udpServerPort}`)
+        console.log(`UDP server listening on ${this.serverAddress}:${this.udpServerPort}`);
     }
 
     private handleUdpMessage(uid: string, message: string): void {

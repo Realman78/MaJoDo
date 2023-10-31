@@ -50,6 +50,7 @@ export class WebSocketGameServer implements GameServerInterface{
                 });
             });
         }
+        console.log(`Websocket server started`);
     }
 
     
