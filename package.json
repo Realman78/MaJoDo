@@ -3,6 +3,7 @@
   "version": "1.0.13",
   "description": "A template game server",
   "main": "dist/index.js",
+  "types": "src/index.d.ts",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
