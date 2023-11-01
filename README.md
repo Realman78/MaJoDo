@@ -33,7 +33,9 @@ Find example clients [here](https://github.com/Realman78/majodo-client-examples)
   
 
 ## Basic Usage
-    const MaJoDo = require('majodo');
+    /* If you watched the YouTube video, that is an old version without types. 
+    Now, MaJoDo uses types so use the code below. 🦞 */
+    import { MaJoDo, ServerType } from "majodo";
 
     // Create a new instance with desired server type, host, and ports
     const majodo = new MaJoDo(ServerType.WS, "0.0.0.0", 3000);
