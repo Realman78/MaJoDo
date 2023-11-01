@@ -71,4 +71,7 @@ Find example clients [here](https://github.com/Realman78/majodo-client-examples)
   
 ## Documentation & Tutorials
 
-For a comprehensive tutorial on setting up and integrating MaJoDo in your game project
+For a comprehensive tutorial on setting up and integrating MaJoDo in your game project check out this YouTube video: 
+https://www.youtube.com/watch?v=47FUo0pDsHA
+
+**Disclaimer**: The video is a bit outdated regarding the server, check out the [section above on basic usage](#basic-usage).
