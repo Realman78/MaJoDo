@@ -1,9 +1,8 @@
 declare module "majodo" {
   import { Application } from "express";
-  import { Server } from "http";
   import WebSocket from "ws";
-  import dgram from "dgram";
-  import http from "http";
+  import * as dgram from "dgram";
+  import * as http from "http";
 
   interface GameServerInterface {
     broadcastMessageToRoom(
@@ -54,7 +53,7 @@ declare module "majodo" {
     );
 
     getExpressServer(): Application;
-    getHttpServer(): Server;
+    getHttpServer(): http.Server;
   }
 
   export enum ServerType {

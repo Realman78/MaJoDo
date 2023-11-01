@@ -21,7 +21,7 @@ interface RoomToClient {
   [roomName: string]: string[];
 }
 
-class MaJoDo {
+export class MaJoDo {
   public static IDLE_ALLOWED_TIMEOUT = 60_000;
   public static IDLE_CHECK_TIMEOUT = 10_000;
   public static roomsToClient: RoomToClient = {};
