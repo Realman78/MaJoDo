@@ -99,7 +99,7 @@ declare module "majodo" {
 
     start(httpDataLimit?: string): void;
     getType(): ServerType;
-    getGameServer(): UDPGameServer | WebSocketGameServer; // Make sure to define these classes/interfaces too
+    getGameServer(): UDPGameServer | WebSocketGameServer;
     getGameServerRaw(): dgram.Socket | WebSocket.Server;
     getExpressServer(): Application;
   }
