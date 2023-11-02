@@ -41,7 +41,7 @@ Find example clients [here](https://github.com/Realman78/majodo-client-examples)
     const majodo = new MaJoDo(ServerType.WS, "0.0.0.0", 3000);
 
     // UDP: 
-    // const majodo = new MaJoDo(ServerType.WS, "0.0.0.0", 3000, UDP_PORT);
+    // const majodo = new MaJoDo(ServerType.UDP, "0.0.0.0", 3000, UDP_PORT);
 
     
     // Start the server
